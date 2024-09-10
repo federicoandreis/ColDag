@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Collaborative DAG Drawing</h1>
+<div id="editor">
+    <div id="graph"></div>
+    <div id="controls">
+        <input type="text" id="node-label" placeholder="Node Label">
+        <button id="add-node">Add Node</button>
+        <button id="add-edge">Add Edge</button>
+        <button id="remove-selected">Remove Selected</button>
+        <button id="clear-all">Clear All</button>
+        <button id="instructions">Instructions</button>
+        <input type="text" id="project-name" placeholder="Project Name">
+        <button id="save-project">Save Project</button>
+        <button id="export-json">Export JSON</button>
+        <input type="file" id="load-project-file" accept=".json">
+        <button id="load-project">Load Project from File</button>
+    </div>
+</div>
+<div id="projects-list"></div>
+
+<div id="instructions-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Instructions</h2>
+        <ul>
+            <li>Add Node: Enter a label and click 'Add Node'</li>
+            <li>Add Edge: Click 'Add Edge', then click and drag between nodes</li>
+            <li>Remove: Select nodes/edges and click 'Remove Selected'</li>
+            <li>Clear All: Click 'Clear All' to remove everything</li>
+            <li>Save: Enter a project name and click 'Save Project'</li>
+            <li>Load: Click on a project name in the list below</li>
+            <li>Annotate: Right-click on a node to add an annotation</li>
+            <li>Export: Click 'Export JSON' to download the current graph</li>
+            <li>Load from File: Select a JSON file and click 'Load Project from File'</li>
+        </ul>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

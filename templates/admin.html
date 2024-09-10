@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Admin Dashboard</h1>
+<h2>All Projects</h2>
+<button id="export-all-json">Export All JSON</button>
+<ul>
+{% for project in projects %}
+    <li>
+        <strong>{{ project.name }}</strong> (User ID: {{ project.user_id }})
+        <pre>{{ project.content }}</pre>
+    </li>
+{% endfor %}
+</ul>
+<script>
+document.getElementById('export-all-json').addEventListener('click', function() {
+    window.location.href = '{{ url_for("export_all_graphs") }}';
+});
+</script>
+{% endblock %}
