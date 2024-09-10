@@ -1,0 +1,23 @@
+Project Brief: Collaborative DAG Drawing Web Application
+
+Overview
+
+The aim of this project is to develop a user-friendly, collaborative web application that allows users to draw Directed Acyclic Graphs (DAGs). The application should be accessible to multiple users simultaneously, each working independently on the same project. The application should be simple to use, catering to domain experts with potentially low technical skills.
+Key Features
+User Interface: The application should have an intuitive graphical user interface (GUI) for drawing DAGs. The interface should be designed with simplicity and ease of use in mind, inspired by platforms like Dagitty.
+Multi-user Access: The application should support multiple users working on the same project independently. Each user session should be separate from others, ensuring individual workspaces. A simple user+password login system would be helpful.
+Scripting Language Integration: While the user interface should be simple, the underlying mechanism should utilise a scripting language like Graphviz for encoding the graphs. However, I am open to other suitable options.
+User and Admin Access Levels: The application should have two levels of access - 'User' and 'Admin'. Admins should have the ability to view all the creations by the users.
+Operations on Submissions: The application should support the execution of certain operations on the submissions (e.g., computing statistics). The specifics of these operations will be defined at a later stage.
+Node Creation and Annotation: Users should be provided with a set of pre-prepared nodes and potentially edges, with the ability to create new ones. Additionally, users should be able to annotate each element of their graphs (e.g., via a "right-click, annotate" feature), with the annotation being saved with the individual submission.
+Open Source and Hosting: The application should be built using open-source software only. Ideally, it will be hosted on GitHub and shared widely once it reaches a functional stage.
+Modularity: Given the potential for future expansion, the codebase should be as modular as possible to facilitate easy addition or modification of features.
+
+Suggested Technologies
+Frontend: JavaScript frameworks like React.js or Vue.js for building the user interface. For the DAG drawing functionality, maybe Mermaid Flow, a JavaScript-based diagram and flowchart generating tool that is simple and user-friendly. 
+Backend: Node.js or Python (Flask/Django) for server-side operations. 
+Database: PostgreSQL or MongoDB for storing user data and graph information. 
+Graph Scripting: Mermaid for encoding the graphs. Its syntax is simple and it integrates well with JavaScript, making it a good fit for this project. 
+Hosting: GitHub for version control and code hosting. 
+
+By using Mermaid Flow, we can provide a user-friendly interface for creating DAGs while also maintaining the technical robustness of the application through its underlying scripting language. This will allow us to cater to users with varying levels of technical expertise.
