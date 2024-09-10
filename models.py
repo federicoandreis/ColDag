@@ -29,11 +29,3 @@ class Project(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    versions = db.relationship('ProjectVersion', backref='project', lazy=True)
-
-class ProjectVersion(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
-    version_number = db.Column(db.Integer, nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
