@@ -6,6 +6,7 @@ from config import Config
 import os
 import json
 from io import BytesIO
+import networkx as nx
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -73,7 +74,7 @@ def logout():
 @login_required
 def save_project():
     data = request.json
-    project = Project(user_id=current_user.id, name=data['name'], content=data['content'])
+    project = Project(user_id=current_user.id, name=data['name'], content=json.dumps(data['content']))
     db.session.add(project)
     db.session.commit()
     return jsonify({'success': True})
@@ -82,7 +83,7 @@ def save_project():
 @login_required
 def get_projects():
     projects = Project.query.filter_by(user_id=current_user.id).all()
-    return jsonify([{'id': p.id, 'name': p.name, 'content': p.content} for p in projects])
+    return jsonify([{'id': p.id, 'name': p.name, 'content': json.loads(p.content)} for p in projects])
 
 @app.route('/admin')
 @login_required
@@ -133,6 +134,108 @@ def load_project_from_file():
         return jsonify({'success': True})
     except json.JSONDecodeError:
         return jsonify({'success': False, 'error': 'Invalid JSON format'})
+
+@app.route('/graph_statistics', methods=['POST'])
+@login_required
+def graph_statistics():
+    data = request.json
+    nodes = data.get('nodes', [])
+    edges = data.get('edges', [])
+
+    G = nx.DiGraph()
+    for node in nodes:
+        G.add_node(node['id'])
+    for edge in edges:
+        G.add_edge(edge['from'], edge['to'])
+
+    stats = {
+        'num_nodes': G.number_of_nodes(),
+        'num_edges': G.number_of_edges(),
+        'avg_degree': sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0,
+        'is_dag': nx.is_directed_acyclic_graph(G),
+        'connected_components': nx.number_connected_components(G.to_undirected()),
+        'strongly_connected_components': nx.number_strongly_connected_components(G),
+    }
+
+    if stats['is_dag']:
+        longest_path = nx.dag_longest_path(G)
+        stats['longest_path_length'] = len(longest_path) - 1
+        stats['longest_path_nodes'] = [nodes[i]['label'] for i in longest_path]
+
+        articulation_points = list(nx.articulation_points(G.to_undirected()))
+        stats['critical_nodes'] = [nodes[i]['label'] for i in articulation_points]
+
+        topo_sort = list(nx.topological_sort(G))
+        stats['topological_order'] = [nodes[i]['label'] for i in topo_sort]
+
+    stats['degree_centrality'] = nx.degree_centrality(G)
+    stats['betweenness_centrality'] = nx.betweenness_centrality(G)
+    stats['closeness_centrality'] = nx.closeness_centrality(G)
+
+    stats['eccentricity'] = nx.eccentricity(G.to_undirected())
+    stats['radius'] = nx.radius(G.to_undirected())
+    stats['diameter'] = nx.diameter(G.to_undirected())
+    stats['clustering_coefficient'] = nx.average_clustering(G.to_undirected())
+    stats['pagerank'] = nx.pagerank(G)
+
+    # Graph Coloring
+    coloring = nx.greedy_color(G.to_undirected())
+    stats['graph_coloring'] = {nodes[node_id]['label']: color for node_id, color in coloring.items()}
+    stats['chromatic_number'] = max(coloring.values()) + 1
+
+    # Minimum Spanning Tree (for undirected graphs)
+    if not nx.is_directed(G):
+        mst = list(nx.minimum_spanning_tree(G).edges())
+        stats['minimum_spanning_tree'] = [f"{nodes[u]['label']} - {nodes[v]['label']}" for u, v in mst]
+
+    # Shortest Path (Dijkstra's algorithm)
+    if len(nodes) > 1:
+        source = nodes[0]['id']
+        target = nodes[-1]['id']
+        try:
+            shortest_path = nx.dijkstra_path(G, source, target)
+            stats['shortest_path'] = [nodes[i]['label'] for i in shortest_path]
+            stats['shortest_path_length'] = nx.dijkstra_path_length(G, source, target)
+        except nx.NetworkXNoPath:
+            stats['shortest_path'] = "No path exists between the first and last nodes"
+            stats['shortest_path_length'] = float('inf')
+
+    # Cycle detection
+    try:
+        cycle = nx.find_cycle(G)
+        stats['has_cycle'] = True
+        stats['cycle'] = [nodes[node]['label'] for node in cycle]
+    except nx.NetworkXNoCycle:
+        stats['has_cycle'] = False
+
+    # Graph density
+    stats['graph_density'] = nx.density(G)
+
+    # Graph diameter explanation
+    stats['diameter_explanation'] = "The diameter of a graph is the maximum eccentricity of any vertex in the graph. In other words, it is the greatest distance between any pair of vertices."
+
+    # New advanced operations
+    # Eigenvector centrality
+    stats['eigenvector_centrality'] = nx.eigenvector_centrality(G)
+
+    # Assortativity coefficient
+    stats['assortativity_coefficient'] = nx.degree_assortativity_coefficient(G)
+
+    # Graph planarity
+    stats['is_planar'] = nx.check_planarity(G)[0]
+
+    # Convert node IDs to labels in measures
+    for measure in ['degree_centrality', 'betweenness_centrality', 'closeness_centrality', 'eccentricity', 'pagerank', 'eigenvector_centrality']:
+        stats[measure] = {nodes[node_id]['label']: value for node_id, value in stats[measure].items()}
+
+    return jsonify(stats)
+
+@app.route('/get_node_suggestions')
+@login_required
+def get_node_suggestions():
+    with open('node_suggestions.json', 'r') as f:
+        suggestions = json.load(f)
+    return jsonify(suggestions)
 
 if __name__ == '__main__':
     with app.app_context():

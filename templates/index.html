@@ -3,19 +3,26 @@
 {% block content %}
 <h1>Collaborative DAG Drawing</h1>
 <div id="editor">
-    <div id="graph"></div>
-    <div id="controls">
-        <input type="text" id="node-label" placeholder="Node Label">
-        <button id="add-node">Add Node</button>
-        <button id="add-edge">Add Edge</button>
-        <button id="remove-selected">Remove Selected</button>
-        <button id="clear-all">Clear All</button>
-        <button id="instructions">Instructions</button>
-        <input type="text" id="project-name" placeholder="Project Name">
-        <button id="save-project">Save Project</button>
-        <button id="export-json">Export JSON</button>
-        <input type="file" id="load-project-file" accept=".json">
-        <button id="load-project">Load Project from File</button>
+    <div id="graph-container">
+        <div id="graph"></div>
+        <div id="controls">
+            <input type="text" id="node-label" placeholder="Node Label">
+            <button id="add-node">Add Node</button>
+            <button id="add-edge">Add Edge</button>
+            <button id="remove-selected">Remove Selected</button>
+            <button id="clear-all">Clear All</button>
+            <button id="instructions">Instructions</button>
+            <input type="text" id="project-name" placeholder="Project Name">
+            <button id="save-project">Save Project</button>
+            <button id="export-json">Export JSON</button>
+            <input type="file" id="load-project-file" accept=".json">
+            <button id="load-project">Load Project from File</button>
+            <button id="show-statistics">Show Statistics</button>
+        </div>
+    </div>
+    <div id="suggested-nodes">
+        <h3>Suggested Nodes</h3>
+        <div id="suggested-nodes-list"></div>
     </div>
 </div>
 <div id="projects-list"></div>
@@ -25,7 +32,7 @@
         <span class="close">&times;</span>
         <h2>Instructions</h2>
         <ul>
-            <li>Add Node: Enter a label and click 'Add Node'</li>
+            <li>Add Node: Enter a label and click 'Add Node' or click on a suggested node</li>
             <li>Add Edge: Click 'Add Edge', then click and drag between nodes</li>
             <li>Remove: Select nodes/edges and click 'Remove Selected'</li>
             <li>Clear All: Click 'Clear All' to remove everything</li>
@@ -34,7 +41,16 @@
             <li>Annotate: Right-click on a node to add an annotation</li>
             <li>Export: Click 'Export JSON' to download the current graph</li>
             <li>Load from File: Select a JSON file and click 'Load Project from File'</li>
+            <li>Statistics: Click 'Show Statistics' to view graph statistics</li>
         </ul>
+    </div>
+</div>
+
+<div id="statistics-modal" class="modal">
+    <div class="modal-content statistics-content">
+        <span class="close">&times;</span>
+        <h2>Graph Statistics</h2>
+        <div id="statistics-list" class="statistics-list"></div>
     </div>
 </div>
 

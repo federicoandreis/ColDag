@@ -1,0 +1,8 @@
+{
+    "nodes": [
+        {"label": "Education", "annotation": "Level of education"},
+        {"label": "Income", "annotation": "Annual income"},
+        {"label": "Age", "annotation": "Age in years"},
+        {"label": "Employment", "annotation": "Employment status"}
+    ]
+}
