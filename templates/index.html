@@ -18,6 +18,7 @@
             <input type="file" id="load-project-file" accept=".json">
             <button id="load-project">Load Project from File</button>
             <button id="show-statistics">Show Statistics</button>
+            <button id="version-history">Version History</button>
         </div>
     </div>
     <div id="suggested-nodes">
@@ -42,6 +43,7 @@
             <li>Export: Click 'Export JSON' to download the current graph</li>
             <li>Load from File: Select a JSON file and click 'Load Project from File'</li>
             <li>Statistics: Click 'Show Statistics' to view graph statistics</li>
+            <li>Version History: Click 'Version History' to view and load previous versions</li>
         </ul>
     </div>
 </div>
@@ -51,6 +53,14 @@
         <span class="close">&times;</span>
         <h2>Graph Statistics</h2>
         <div id="statistics-list" class="statistics-list"></div>
+    </div>
+</div>
+
+<div id="version-history-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Version History</h2>
+        <ul id="version-list"></ul>
     </div>
 </div>
 
