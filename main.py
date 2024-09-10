@@ -1,17 +1,12 @@
-import re
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, UserProfile, Project
+from models import db, User, Project
 from config import Config
 import os
 import json
 from io import BytesIO
 import networkx as nx
-from datetime import datetime, timedelta
-from functools import wraps
-import secrets
-from flask_mail import Mail, Message
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -20,69 +15,20 @@ db.init_app(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-mail = Mail(app)
-
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin:
-            flash('You do not have permission to access this page.', 'error')
-            return redirect(url_for('index'))
-        return f(*args, **kwargs)
-    return decorated_function
-
 def create_default_user():
     username = 'fede'
     password = 'admin'
-    email = 'fede@example.com'
     if not User.query.filter_by(username=username).first():
-        new_user = User(username=username, email=email, password=generate_password_hash(password), is_admin=True, email_confirmed=True)
+        new_user = User(username=username, password=generate_password_hash(password), is_admin=True)
         db.session.add(new_user)
         db.session.commit()
         print(f"Default user '{username}' created.")
     else:
         print(f"Default user '{username}' already exists.")
-
-def send_verification_email(user):
-    token = user.generate_email_confirmation_token()
-    msg = Message('Confirm Your Email',
-                  sender='noreply@yourdomain.com',
-                  recipients=[user.email])
-    msg.body = f'''To confirm your email, visit the following link:
-{url_for('verify_email', token=token, _external=True)}
-
-If you did not make this request then simply ignore this email and no changes will be made.
-'''
-    mail.send(msg)
-
-def is_password_strong(password):
-    if len(password) < 8:
-        return False
-    if not re.search(r'[A-Z]', password):
-        return False
-    if not re.search(r'[a-z]', password):
-        return False
-    if not re.search(r'\d', password):
-        return False
-    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
-        return False
-    return True
-
-def send_password_reset_email(user):
-    token = user.generate_password_reset_token()
-    msg = Message('Password Reset Request',
-                  sender='noreply@yourdomain.com',
-                  recipients=[user.email])
-    msg.body = f'''To reset your password, visit the following link:
-{url_for('reset_password', token=token, _external=True)}
-
-If you did not make this request then simply ignore this email and no changes will be made.
-'''
-    mail.send(msg)
 
 @app.route('/')
 @login_required
@@ -95,104 +41,28 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         user = User.query.filter_by(username=username).first()
-        
-        if user:
-            if user.locked_until and user.locked_until > datetime.utcnow():
-                flash('Your account is temporarily locked. Please try again later.', 'error')
-                return redirect(url_for('login'))
-            
-            if check_password_hash(user.password, password):
-                if not user.is_active:
-                    flash('Your account is deactivated. Please contact an administrator.', 'error')
-                    return redirect(url_for('login'))
-                if not user.email_confirmed:
-                    flash('Please confirm your email before logging in.', 'warning')
-                    return redirect(url_for('login'))
-                
-                login_user(user)
-                user.last_login = datetime.utcnow()
-                user.failed_login_attempts = 0
-                db.session.commit()
-                return redirect(url_for('index'))
-            else:
-                user.increment_failed_attempts()
-                if user.failed_login_attempts >= 5:
-                    user.lock_account()
-                    flash('Too many failed login attempts. Your account has been temporarily locked.', 'error')
-                else:
-                    flash('Invalid username or password')
-        else:
-            flash('Invalid username or password')
-    
+        if user and check_password_hash(user.password, password):
+            login_user(user)
+            return redirect(url_for('index'))
+        flash('Invalid username or password')
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         username = request.form.get('username')
-        email = request.form.get('email')
         password = request.form.get('password')
+        is_admin = request.form.get('is_admin') == 'on'
         
         if User.query.filter_by(username=username).first():
             flash('Username already exists')
-        elif User.query.filter_by(email=email).first():
-            flash('Email already exists')
-        elif not is_password_strong(password):
-            flash('Password is not strong enough. It should be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one digit, and one special character.')
         else:
-            new_user = User(username=username, email=email, password=generate_password_hash(password))
+            new_user = User(username=username, password=generate_password_hash(password), is_admin=is_admin)
             db.session.add(new_user)
             db.session.commit()
-            send_verification_email(new_user)
-            flash('Registration successful. Please check your email to verify your account.')
+            flash('Registration successful')
             return redirect(url_for('login'))
     return render_template('register.html')
-
-@app.route('/forgot_password', methods=['GET', 'POST'])
-def forgot_password():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        user = User.query.filter_by(email=email).first()
-        if user:
-            send_password_reset_email(user)
-            flash('An email has been sent with instructions to reset your password.', 'info')
-        else:
-            flash('No account found with that email address.', 'error')
-        return redirect(url_for('login'))
-    return render_template('forgot_password.html')
-
-@app.route('/reset_password/<token>', methods=['GET', 'POST'])
-def reset_password(token):
-    user = User.verify_password_reset_token(token)
-    if not user:
-        flash('Invalid or expired token', 'error')
-        return redirect(url_for('login'))
-    if request.method == 'POST':
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-        if password != confirm_password:
-            flash('Passwords do not match.', 'error')
-        elif not is_password_strong(password):
-            flash('Password is not strong enough. It should be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one digit, and one special character.')
-        else:
-            user.password = generate_password_hash(password)
-            user.unlock_account()  # Unlock the account when resetting password
-            db.session.commit()
-            flash('Your password has been reset.', 'success')
-            return redirect(url_for('login'))
-    return render_template('reset_password.html')
-
-@app.route('/verify_email/<token>')
-def verify_email(token):
-    user = User.query.filter_by(email_confirmation_token=token).first()
-    if user:
-        user.email_confirmed = True
-        user.email_confirmation_token = None
-        db.session.commit()
-        flash('Your email has been confirmed. You can now login.', 'success')
-    else:
-        flash('The confirmation link is invalid or has expired.', 'danger')
-    return redirect(url_for('login'))
 
 @app.route('/logout')
 @login_required
@@ -200,88 +70,172 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-@app.route('/profile', methods=['GET', 'POST'])
+@app.route('/save_project', methods=['POST'])
 @login_required
-def profile():
-    if not current_user.profile:
-        current_user.profile = UserProfile()
-        db.session.commit()
+def save_project():
+    data = request.json
+    project = Project(user_id=current_user.id, name=data['name'], content=json.dumps(data['content']))
+    db.session.add(project)
+    db.session.commit()
+    return jsonify({'success': True})
 
-    if request.method == 'POST':
-        current_user.profile.full_name = request.form.get('full_name')
-        current_user.profile.bio = request.form.get('bio')
-        current_user.profile.location = request.form.get('location')
-        db.session.commit()
-        flash('Profile updated successfully', 'success')
-        return redirect(url_for('profile'))
-
-    return render_template('profile.html')
+@app.route('/get_projects')
+@login_required
+def get_projects():
+    projects = Project.query.filter_by(user_id=current_user.id).all()
+    return jsonify([{'id': p.id, 'name': p.name, 'content': json.loads(p.content)} for p in projects])
 
 @app.route('/admin')
 @login_required
-@admin_required
 def admin():
+    if not current_user.is_admin:
+        flash('Access denied')
+        return redirect(url_for('index'))
     projects = Project.query.all()
     return render_template('admin.html', projects=projects)
 
-@app.route('/admin/users')
+@app.route('/export_current_graph', methods=['POST'])
 @login_required
-@admin_required
-def admin_users():
-    users = User.query.all()
-    return render_template('admin_users.html', users=users)
+def export_current_graph():
+    data = request.json
+    json_data = json.dumps(data, indent=2)
+    return send_file(
+        BytesIO(json_data.encode()),
+        mimetype='application/json',
+        as_attachment=True,
+        download_name='current_graph.json'
+    )
 
-@app.route('/admin/toggle_user/<int:user_id>')
+@app.route('/export_all_graphs')
 @login_required
-@admin_required
-def toggle_user(user_id):
-    user = User.query.get_or_404(user_id)
-    if user != current_user:
-        user.is_active = not user.is_active
-        db.session.commit()
-        flash(f"User {user.username} has been {'activated' if user.is_active else 'deactivated'}.", 'success')
-    else:
-        flash("You cannot deactivate your own account.", 'error')
-    return redirect(url_for('admin_users'))
+def export_all_graphs():
+    if not current_user.is_admin:
+        flash('Access denied')
+        return redirect(url_for('index'))
+    
+    projects = Project.query.all()
+    all_graphs = {p.name: json.loads(p.content) for p in projects}
+    json_data = json.dumps(all_graphs, indent=2)
+    
+    return send_file(
+        BytesIO(json_data.encode()),
+        mimetype='application/json',
+        as_attachment=True,
+        download_name='all_graphs.json'
+    )
 
-@app.route('/admin/delete_user/<int:user_id>')
+@app.route('/load_project_from_file', methods=['POST'])
 @login_required
-@admin_required
-def delete_user(user_id):
-    user = User.query.get_or_404(user_id)
-    if user != current_user and not user.is_admin:
-        db.session.delete(user)
-        db.session.commit()
-        flash(f"User {user.username} has been deleted.", 'success')
-    else:
-        flash("You cannot delete your own account or another admin account.", 'error')
-    return redirect(url_for('admin_users'))
+def load_project_from_file():
+    data = request.json
+    content = data.get('content')
+    try:
+        json.loads(content)  # Validate JSON
+        return jsonify({'success': True})
+    except json.JSONDecodeError:
+        return jsonify({'success': False, 'error': 'Invalid JSON format'})
 
-@app.route('/admin/toggle_admin/<int:user_id>')
+@app.route('/graph_statistics', methods=['POST'])
 @login_required
-@admin_required
-def toggle_admin(user_id):
-    user = User.query.get_or_404(user_id)
-    if user != current_user:
-        user.is_admin = not user.is_admin
-        db.session.commit()
-        flash(f"Admin status for {user.username} has been {'granted' if user.is_admin else 'revoked'}.", 'success')
-    else:
-        flash("You cannot change your own admin status.", 'error')
-    return redirect(url_for('admin_users'))
+def graph_statistics():
+    data = request.json
+    nodes = data.get('nodes', [])
+    edges = data.get('edges', [])
 
-@app.route('/admin/reset_password/<int:user_id>')
+    G = nx.DiGraph()
+    for node in nodes:
+        G.add_node(node['id'])
+    for edge in edges:
+        G.add_edge(edge['from'], edge['to'])
+
+    stats = {
+        'num_nodes': G.number_of_nodes(),
+        'num_edges': G.number_of_edges(),
+        'avg_degree': sum(dict(G.degree()).values()) / G.number_of_nodes() if G.number_of_nodes() > 0 else 0,
+        'is_dag': nx.is_directed_acyclic_graph(G),
+        'connected_components': nx.number_connected_components(G.to_undirected()),
+        'strongly_connected_components': nx.number_strongly_connected_components(G),
+    }
+
+    if stats['is_dag']:
+        longest_path = nx.dag_longest_path(G)
+        stats['longest_path_length'] = len(longest_path) - 1
+        stats['longest_path_nodes'] = [nodes[i]['label'] for i in longest_path]
+
+        articulation_points = list(nx.articulation_points(G.to_undirected()))
+        stats['critical_nodes'] = [nodes[i]['label'] for i in articulation_points]
+
+        topo_sort = list(nx.topological_sort(G))
+        stats['topological_order'] = [nodes[i]['label'] for i in topo_sort]
+
+    stats['degree_centrality'] = nx.degree_centrality(G)
+    stats['betweenness_centrality'] = nx.betweenness_centrality(G)
+    stats['closeness_centrality'] = nx.closeness_centrality(G)
+
+    stats['eccentricity'] = nx.eccentricity(G.to_undirected())
+    stats['radius'] = nx.radius(G.to_undirected())
+    stats['diameter'] = nx.diameter(G.to_undirected())
+    stats['clustering_coefficient'] = nx.average_clustering(G.to_undirected())
+    stats['pagerank'] = nx.pagerank(G)
+
+    # Graph Coloring
+    coloring = nx.greedy_color(G.to_undirected())
+    stats['graph_coloring'] = {nodes[node_id]['label']: color for node_id, color in coloring.items()}
+    stats['chromatic_number'] = max(coloring.values()) + 1
+
+    # Minimum Spanning Tree (for undirected graphs)
+    if not nx.is_directed(G):
+        mst = list(nx.minimum_spanning_tree(G).edges())
+        stats['minimum_spanning_tree'] = [f"{nodes[u]['label']} - {nodes[v]['label']}" for u, v in mst]
+
+    # Shortest Path (Dijkstra's algorithm)
+    if len(nodes) > 1:
+        source = nodes[0]['id']
+        target = nodes[-1]['id']
+        try:
+            shortest_path = nx.dijkstra_path(G, source, target)
+            stats['shortest_path'] = [nodes[i]['label'] for i in shortest_path]
+            stats['shortest_path_length'] = nx.dijkstra_path_length(G, source, target)
+        except nx.NetworkXNoPath:
+            stats['shortest_path'] = "No path exists between the first and last nodes"
+            stats['shortest_path_length'] = float('inf')
+
+    # Cycle detection
+    try:
+        cycle = nx.find_cycle(G)
+        stats['has_cycle'] = True
+        stats['cycle'] = [nodes[node]['label'] for node in cycle]
+    except nx.NetworkXNoCycle:
+        stats['has_cycle'] = False
+
+    # Graph density
+    stats['graph_density'] = nx.density(G)
+
+    # Graph diameter explanation
+    stats['diameter_explanation'] = "The diameter of a graph is the maximum eccentricity of any vertex in the graph. In other words, it is the greatest distance between any pair of vertices."
+
+    # New advanced operations
+    # Eigenvector centrality
+    stats['eigenvector_centrality'] = nx.eigenvector_centrality(G)
+
+    # Assortativity coefficient
+    stats['assortativity_coefficient'] = nx.degree_assortativity_coefficient(G)
+
+    # Graph planarity
+    stats['is_planar'] = nx.check_planarity(G)[0]
+
+    # Convert node IDs to labels in measures
+    for measure in ['degree_centrality', 'betweenness_centrality', 'closeness_centrality', 'eccentricity', 'pagerank', 'eigenvector_centrality']:
+        stats[measure] = {nodes[node_id]['label']: value for node_id, value in stats[measure].items()}
+
+    return jsonify(stats)
+
+@app.route('/get_node_suggestions')
 @login_required
-@admin_required
-def reset_password_admin(user_id):
-    user = User.query.get_or_404(user_id)
-    new_password = secrets.token_urlsafe(12)
-    user.password = generate_password_hash(new_password)
-    db.session.commit()
-    flash(f"Password for {user.username} has been reset. New password: {new_password}", 'success')
-    return redirect(url_for('admin_users'))
-
-# ... (keep the rest of the existing routes)
+def get_node_suggestions():
+    with open('node_suggestions.json', 'r') as f:
+        suggestions = json.load(f)
+    return jsonify(suggestions)
 
 if __name__ == '__main__':
     with app.app_context():
