@@ -13,8 +13,6 @@ flask-login = "^0.6.3"
 werkzeug = "^3.0.4"
 psycopg2-binary = "^2.9.9"
 networkx = "^3.3"
-flask-mail = "^0.10.0"
-itsdangerous = "^2.2.0"
 
 
 [build-system]
